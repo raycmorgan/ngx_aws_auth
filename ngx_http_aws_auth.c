@@ -147,11 +147,30 @@ ngx_http_aws_auth_variable_s3(ngx_http_request_t *r, ngx_http_variable_value_t *
     }
 
     u_char *str_to_sign = ngx_palloc(r->pool,r->uri.len + aws_conf->s3_bucket.len + 200);
-    ngx_sprintf(str_to_sign, "GET\n\n\n\nx-amz-date:%V\n/%V%s%Z",
-        &ngx_cached_http_time, &aws_conf->s3_bucket,uri);
+ 
+
+    char method[4];
+    
+    if (r->method == NGX_HTTP_GET) {
+	strcpy(method, "GET\0");
+    } else if (r->method == NGX_HTTP_PUT) {
+	strcpy(method, "PUT\0");
+    }
+
+
+    if (r->headers_in.content_type && r->headers_in.content_type->hash) {
+        u_char *content_type = r->headers_in.content_type->value.data;
+
+        ngx_sprintf(str_to_sign, "%s\n\n%s\n\nx-amz-date:%V\n/%V%s%Z",
+            method, content_type, &ngx_cached_http_time, &aws_conf->s3_bucket,uri);
+
+    } else {
+    	ngx_sprintf(str_to_sign, "%s\n\n\n\nx-amz-date:%V\n/%V%s%Z",
+            method, &ngx_cached_http_time, &aws_conf->s3_bucket,uri);
+    }
+   
+
     ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,"String to sign:%s",str_to_sign);
-
-
 
     if (evp_md==NULL)
     {
